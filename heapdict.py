@@ -6,15 +6,10 @@ from functools import (
     partial
 )
 from typing import (
-    TypeVar,
     Mapping,
     MutableMapping,
-    Iterable,
-    overload
+    Iterable
 )
-
-K = TypeVar('K')
-P = TypeVar('P')
 
 
 def use_docstring_of(target):
@@ -33,21 +28,9 @@ def use_docstring_of(target):
     return decorator
 
 
-class BaseHeapDict(MutableMapping[K, P], ABC):
+class BaseHeapDict(MutableMapping, ABC):
 
-    @overload
-    def __init__(self) -> None:
-        ...
-
-    @overload
-    def __init__(self, iterable: Mapping[K, P]) -> None:
-        ...
-
-    @overload
-    def __init__(self, iterable: Iterable[Iterable[K | P]]) -> None:
-        ...
-
-    def __init__(self, iterable=None) -> None:
+    def __init__(self, iterable=None):
         """ Initialize priority queue instance.
 
         Optional *iterable* argument provides an initial iterable of pairs (key, priority)
@@ -61,8 +44,8 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
             iterable = iterable.items()
         elif not isinstance(iterable, Iterable):
             raise TypeError(f'{type(iterable).__qualname__!r} object is not iterable')
-        self._heap: list[tuple[K, P]] = []
-        self._keys: dict[K, int] = {}
+        self._heap = []
+        self._keys = {}
         for key, priority in iterable:
             if (i := self._keys.get(key, None)) is not None:
                 self._heap[i] = (key, priority)
@@ -73,43 +56,48 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
             self._sift_up(i)
 
     @classmethod
-    def fromkeys(cls, iterable, value) -> 'BaseHeapDict':
+    def fromkeys(cls, iterable, value):
         """ Create a new priority queue with keys from iterable and priorities set to value. """
         return cls((k, value) for k in iterable)
 
     @abstractmethod
-    def _sift_down(self, i: int) -> None:
+    def _sift_down(self, i):
         raise NotImplementedError()
 
     @abstractmethod
-    def _sift_up(self, i: int) -> None:
+    def _sift_up(self, i):
         raise NotImplementedError()
 
     # Приватный метод проверки сохранения инвариантов кучи, предназначенный для тестирования,
     # по аналогии с соответствующим методом _check в sortedcontainers.
-    def _check_invariants(self) -> None:
+    def _check_invariants(self):
         assert len(self._keys) == len(self._heap)
         assert all(self._heap[i][0] == key for key, i in self._keys.items())
         assert all(self._keys[key] == i for i, (key, _) in enumerate(self._heap))
 
-    def _swap(self, i: int, j: int) -> None:
+    def _swap(self, i, j):
         self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
         self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
 
     @use_docstring_of(dict.__len__)
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self._keys)
 
     @use_docstring_of(dict.__iter__)
-    def __iter__(self) -> Iterable[K]:
+    def __iter__(self):
         yield from self._keys
 
+    @use_docstring_of(dict.__repr__)
+    def __repr__(self) -> str:
+        items = ', '.join(f'{key!r}: {priority!r}' for key, priority in self.items())
+        return f'{type(self).__name__}({{{items}}})'
+
     @use_docstring_of(dict.__getitem__)
-    def __getitem__(self, key: K) -> P:
+    def __getitem__(self, key):
         return self._heap[self._keys[key]][1]
 
     @use_docstring_of(dict.__setitem__)
-    def __setitem__(self, key: K, priority: P) -> None:
+    def __setitem__(self, key, priority):
         # Если ключ уже известен, мы могли бы удалить пару ключ-приоритет и заново вставить новую
         # пару с тем же ключом, но новым приоритетом. Однако, это сломает сохранение порядка
         # вставки, поддерживаемое словарём. Поэтому мы просто вставим новый узел в кучу в ту же
@@ -125,7 +113,7 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
             self._sift_down(i)
 
     @use_docstring_of(dict.__delitem__)
-    def __delitem__(self, key: K) -> None:
+    def __delitem__(self, key):
         i = self._keys[key]
         self._swap(i, len(self._heap) - 1)
         self._keys.pop(key)
@@ -134,17 +122,12 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
             self._sift_down(i)
             self._sift_up(i)
 
-    @use_docstring_of(dict.__repr__)
-    def __repr__(self) -> str:
-        items = ', '.join(f'{key!r}: {priority!r}' for key, priority in self.items())
-        return f'{type(self).__name__}({{{items}}})'
-
     @use_docstring_of(dict.copy)
-    def __copy__(self) -> 'BaseHeapDict':
+    def __copy__(self):
         return self.copy()
 
     @use_docstring_of(dict.copy)
-    def copy(self) -> 'BaseHeapDict':
+    def copy(self):
         new_heap_dict = type(self)()
         new_heap_dict._heap = self._heap.copy()
         new_heap_dict._keys = self._keys.copy()
@@ -154,11 +137,11 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
     # на восстановление свойств кучи после каждого удаления. Поэтому мы переопределяем этот
     # метод более эффективной реализацией.
     @use_docstring_of(dict.clear)
-    def clear(self) -> None:
+    def clear(self):
         self._heap.clear()
         self._keys.clear()
 
-    def popitem(self) -> tuple[K, P]:
+    def popitem(self):
         try:
             key, priority = self._heap[0]
         except IndexError:
@@ -166,14 +149,14 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
         del self[key]
         return key, priority
 
-    def peekitem(self) -> tuple[K, P]:
+    def peekitem(self):
         try:
             return self._heap[0]
         except IndexError:
             raise KeyError("can't peek item: heapdict is empty")
 
 
-class MinHeapDict(BaseHeapDict[K, P]):
+class MinHeapDict(BaseHeapDict):
     """ Priority queue that supports fast retrieving items with the lowest priority and fast
     changing priorities for arbitrary keys.
 
@@ -187,7 +170,7 @@ class MinHeapDict(BaseHeapDict[K, P]):
     In other respects ``MinHeapDict`` has the same runtime complexity as the built-in ``dict``.
     """
 
-    def _sift_down(self, i: int) -> None:
+    def _sift_down(self, i):
         select_next = partial(max, key=lambda i: self._heap[i][1])
         while True:
             next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
@@ -196,7 +179,7 @@ class MinHeapDict(BaseHeapDict[K, P]):
             self._swap(i, next_index)
             i = next_index
 
-    def _sift_up(self, i: int) -> None:
+    def _sift_up(self, i):
         select_next = partial(min, key=lambda i: self._heap[i][1])
         while True:
             next_index = select_next(x for x in [i, 2 * i + 1, 2 * i + 2] if x < len(self._heap))
@@ -205,12 +188,12 @@ class MinHeapDict(BaseHeapDict[K, P]):
             self._swap(i, next_index)
             i = next_index
 
-    def _check_invariants(self) -> None:
+    def _check_invariants(self):
         super()._check_invariants()
         for i in range(1, len(self._heap)):
             assert self._heap[i][1] >= self._heap[(i - 1) // 2][1]
 
-    def popitem(self) -> tuple[K, P]:
+    def popitem(self):
         """ Remove and return a (key, priority) pair as 2-tuple.
 
         Removed pair will be the pair with the lowest priority. Runtime complexity: `O(log(n))`.
@@ -227,7 +210,7 @@ class MinHeapDict(BaseHeapDict[K, P]):
         """
         return super().popitem()
 
-    def peekitem(self) -> tuple[K, P]:
+    def peekitem(self):
         """ Return a (key, priority) pair as 2-tuple.
 
         Returned pair will be the pair with the lowest priority. Runtime complexity: `O(1)`
@@ -245,7 +228,7 @@ class MinHeapDict(BaseHeapDict[K, P]):
         return super().peekitem()
 
 
-class MaxHeapDict(BaseHeapDict[K, P]):
+class MaxHeapDict(BaseHeapDict):
     """ Priority queue that supports fast retrieving items with the highest priority and fast
     changing priorities for arbitrary keys.
 
@@ -259,7 +242,7 @@ class MaxHeapDict(BaseHeapDict[K, P]):
     In other respects ``MaxHeapDict`` has the same runtime complexity as the built-in ``dict``.
     """
 
-    def _sift_down(self, i: int) -> None:
+    def _sift_down(self, i):
         select_next = partial(min, key=lambda i: self._heap[i][1])
         while True:
             next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
@@ -268,7 +251,7 @@ class MaxHeapDict(BaseHeapDict[K, P]):
             self._swap(i, next_index)
             i = next_index
 
-    def _sift_up(self, i: int) -> None:
+    def _sift_up(self, i):
         select_next = partial(max, key=lambda i: self._heap[i][1])
         while True:
             next_index = select_next(x for x in [i, 2 * i + 1, 2 * i + 2] if x < len(self._heap))
@@ -277,12 +260,12 @@ class MaxHeapDict(BaseHeapDict[K, P]):
             self._swap(i, next_index)
             i = next_index
 
-    def _check_invariants(self) -> None:
+    def _check_invariants(self):
         super()._check_invariants()
         for i in range(1, len(self._heap)):
             assert self._heap[i][1] <= self._heap[(i - 1) // 2][1]
 
-    def popitem(self) -> tuple[K, P]:
+    def popitem(self):
         """ Remove and return a (key, priority) pair as 2-tuple.
 
         Removed pair will be the pair with the highest priority. Runtime complexity: `O(log(n))`.
@@ -297,7 +280,7 @@ class MaxHeapDict(BaseHeapDict[K, P]):
         """
         return super().popitem()
 
-    def peekitem(self) -> tuple[K, P]:
+    def peekitem(self):
         """ Return a (key, priority) pair as 2-tuple.
 
         Returned pair will be the pair with the highest priority. Runtime complexity: `O(1)`
