@@ -75,7 +75,7 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
     @classmethod
     def fromkeys(cls, iterable, value) -> 'BaseHeapDict':
         """ Create a new priority queue with keys from iterable and priorities set to value. """
-        return type(cls)((k, value) for k in iterable)
+        return cls((k, value) for k in iterable)
 
     @abstractmethod
     def _sift_down(self, i: int) -> None:
