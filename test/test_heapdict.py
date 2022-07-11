@@ -89,6 +89,34 @@ class TestHeapDict:
             assert len(heapdict) == 0
             heapdict._check_invariants()
 
+    def test_create(self):
+        for HeapDict in [MinHeapDict, MaxHeapDict]:
+            # create from keys
+            heapdict = HeapDict.fromkeys(['a', 'b', 'c', 'b'], 0)
+            heapdict._check_invariants()
+            assert dict(heapdict) == {'a': 0, 'b': 0, 'c': 0}
+            # create from pairs
+            heapdict = HeapDict([('a', 5), ('b', 1), ('c', 10), ('b', 20)])
+            heapdict._check_invariants()
+            assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
+            # create from another dict
+            heapdict = HeapDict({'a': 5, 'b': 1, 'c': 10, 'b': 20})  # noqa
+            heapdict._check_invariants()
+            assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
+            # create from another HeapDict
+            for AnotherHeapDict in [MinHeapDict, MaxHeapDict]:
+                another_heapdict = AnotherHeapDict({'a': 5, 'b': 1, 'c': 10, 'b': 20})  # noqa
+                heapdict = HeapDict(another_heapdict)
+                heapdict._check_invariants()
+                assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
+            # create empty HeapDict
+            heapdict = HeapDict()
+            heapdict._check_invariants()
+            assert dict(heapdict) == {}
+            # error if create from non-iterable
+            with pytest.raises(TypeError):
+                heapdict = HeapDict(10)  # noqa
+
     def test_pop_item_by_last_index_in_heap(self):
         # Удаление элемента кучи по последнему индексу требует осторожности в реализации.
         # Если обменять последний элемент с последним же, который сейчас удаляется, и попытаться
