@@ -57,8 +57,6 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
 
     def _swap(self, i: int, j: int) -> None: ...
 
-    def _check_invariants(self) -> None: ...
-
 
 class MinHeapDict(BaseHeapDict[K, P]):
 

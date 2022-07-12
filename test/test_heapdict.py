@@ -13,17 +13,26 @@ from heapdict import (
 
 class TestHeapDict:
 
-    def test_basic_usage(self):
+    def check_invariants(self, heapdict: MaxHeapDict | MinHeapDict):
+        assert len(heapdict._keys) == len(heapdict._heap)
+        assert all(heapdict._heap[i][0] == key for key, i in heapdict._keys.items())
+        assert all(heapdict._keys[key] == i for i, (key, _) in enumerate(heapdict._heap))
+        for i in range(1, len(heapdict._heap)):
+            if isinstance(heapdict, MinHeapDict):
+                assert heapdict._heap[i][1] >= heapdict._heap[(i - 1) // 2][1]
+            else:
+                assert heapdict._heap[i][1] <= heapdict._heap[(i - 1) // 2][1]
 
+    def test_basic_usage(self):
         heapdict = MinHeapDict()
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 0
         # Пустой HeapDict эквивалентен False. Мы следуем соглашению для коллекций.
         assert not heapdict
 
         heapdict['a'] = 5
         # Вставка ключа ничего не ломает.
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 1
         # Не пустой HeapDict эквивалентен True.
         assert heapdict
@@ -36,7 +45,7 @@ class TestHeapDict:
 
         heapdict['b'] = 1
         heapdict['c'] = 10
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 3
         # Все ключи и приоритеты на месте.
         assert ('a', 5) in heapdict.items()
@@ -48,7 +57,7 @@ class TestHeapDict:
         heapdict['b'] = 20
         # Увеличение приоритета для ключа, который обладал минимальным приоритетом, ничего не
         # ломает.
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 3
         # Все ключи и приоритеты на месте, кроме изменённого.
         assert ('a', 5) in heapdict.items()
@@ -61,12 +70,12 @@ class TestHeapDict:
         heapdict['e'] = 13
         heapdict.pop('c')
         # Удаление произвольного ключа ничего не ломает.
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 4
 
         assert heapdict.popitem() == ('d', 3)
         # Удаление минимума ничего не ломает.
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 3
         assert heapdict.peekitem() == ('a', 5)
 
@@ -87,31 +96,31 @@ class TestHeapDict:
             with pytest.raises(TypeError):
                 heapdict[[]] = 1
             assert len(heapdict) == 0
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
 
     def test_create(self):
         for HeapDict in [MinHeapDict, MaxHeapDict]:
             # create from keys
             heapdict = HeapDict.fromkeys(['a', 'b', 'c', 'b'], 0)
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             assert dict(heapdict) == {'a': 0, 'b': 0, 'c': 0}
             # create from pairs
             heapdict = HeapDict([('a', 5), ('b', 1), ('c', 10), ('b', 20)])
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
             # create from another dict
             heapdict = HeapDict({'a': 5, 'b': 1, 'c': 10, 'b': 20})  # noqa
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
             # create from another HeapDict
             for AnotherHeapDict in [MinHeapDict, MaxHeapDict]:
                 another_heapdict = AnotherHeapDict({'a': 5, 'b': 1, 'c': 10, 'b': 20})  # noqa
                 heapdict = HeapDict(another_heapdict)
-                heapdict._check_invariants()
+                self.check_invariants(heapdict)
                 assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10}
             # create empty HeapDict
             heapdict = HeapDict()
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             assert dict(heapdict) == {}
             # error if create from non-iterable
             with pytest.raises(TypeError):
@@ -124,13 +133,13 @@ class TestHeapDict:
         heapdict = MinHeapDict({'a': 1, 'b': 2})
         assert heapdict.peekitem() == ('a', 1)
         heapdict.pop('b')
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 1
 
         heapdict = MaxHeapDict({'a': 1, 'b': 2})
         assert heapdict.peekitem() == ('b', 2)
         heapdict.pop('b')
-        heapdict._check_invariants()
+        self.check_invariants(heapdict)
         assert len(heapdict) == 1
 
     def test_preserves_insertion_order_on_change_priority_for_existing_key(self):
@@ -153,7 +162,7 @@ class TestHeapDict:
             heapdict = HeapDict([('a', 1), ('b', 2), ('c', 3), ('d', 2), ('c', 3)])
             heapdict.clear()
             # Очистка не ломает инварианты.
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             # Объект пуст после очистки.
             assert len(heapdict) == 0
 
@@ -162,9 +171,10 @@ class TestHeapDict:
             for HeapDict in [MinHeapDict, MaxHeapDict]:
                 original = HeapDict(zip('abcdef', [3, 3, 1, 6, 3, 4]))
                 clone = copy_func(original)
-
-                original._check_invariants()
-                clone._check_invariants()
+                self.check_invariants(original)
+                self.check_invariants(clone)
+                assert original is not clone
+                assert original == clone
                 clone['x'] = 5
                 assert 'x' in clone
                 assert 'x' not in original
@@ -174,8 +184,8 @@ class TestHeapDict:
                 clone['a'] = 100
                 assert clone['a'] == 100
                 assert original['a'] != 100
-                original._check_invariants()
-                clone._check_invariants()
+                self.check_invariants(original)
+                self.check_invariants(clone)
 
     def test_repr(self):
         heapdict = MinHeapDict({'a': 1, 'b': 2, 'c': 3})
@@ -188,7 +198,7 @@ class TestHeapDict:
         pairs = [(tuple([1]), 3), (tuple([1]), 1), (tuple([1]), 2)]
         for HeapDict in [MinHeapDict, MaxHeapDict]:
             heapdict = HeapDict(pairs)
-            heapdict._check_invariants()
+            self.check_invariants(heapdict)
             # Сохранилась только последняя пара ключ-значение.
             assert len(heapdict) == 1
             assert heapdict[tuple([1])] == 2

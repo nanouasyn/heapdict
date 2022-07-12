@@ -68,13 +68,6 @@ class BaseHeapDict(MutableMapping, ABC):
     def _sift_up(self, i):
         raise NotImplementedError()
 
-    # Приватный метод проверки сохранения инвариантов кучи, предназначенный для тестирования,
-    # по аналогии с соответствующим методом _check в sortedcontainers.
-    def _check_invariants(self):
-        assert len(self._keys) == len(self._heap)
-        assert all(self._heap[i][0] == key for key, i in self._keys.items())
-        assert all(self._keys[key] == i for i, (key, _) in enumerate(self._heap))
-
     def _swap(self, i, j):
         self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
         self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
@@ -188,11 +181,6 @@ class MinHeapDict(BaseHeapDict):
             self._swap(i, next_index)
             i = next_index
 
-    def _check_invariants(self):
-        super()._check_invariants()
-        for i in range(1, len(self._heap)):
-            assert self._heap[i][1] >= self._heap[(i - 1) // 2][1]
-
     def popitem(self):
         """ Remove and return a (key, priority) pair as 2-tuple.
 
@@ -259,11 +247,6 @@ class MaxHeapDict(BaseHeapDict):
                 return
             self._swap(i, next_index)
             i = next_index
-
-    def _check_invariants(self):
-        super()._check_invariants()
-        for i in range(1, len(self._heap)):
-            assert self._heap[i][1] <= self._heap[(i - 1) // 2][1]
 
     def popitem(self):
         """ Remove and return a (key, priority) pair as 2-tuple.
