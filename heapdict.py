@@ -62,10 +62,11 @@ class BaseHeapDict(MutableMapping, ABC):
 
     @abstractmethod
     def _sift_down(self, i):
-        raise NotImplementedError()
+        """ Swaps the *i*-th node with the parent nodes until the invariant is restored. """
 
     @abstractmethod
     def _sift_up(self, i):
+        """ Swaps the *i*-th node with the child nodes until the invariant is restored. """
         raise NotImplementedError()
 
     def _swap(self, i, j):
