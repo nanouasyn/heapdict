@@ -5,6 +5,7 @@ from abc import (
 from functools import (
     partial
 )
+from itertools import chain
 from typing import (
     Mapping,
     MutableMapping,
@@ -30,11 +31,14 @@ def use_docstring_of(target):
 
 class BaseHeapDict(MutableMapping, ABC):
 
-    def __init__(self, iterable=None):
+    def __init__(self, iterable=None, /, **kwargs):
         """ Initialize priority queue instance.
 
         Optional *iterable* argument provides an initial iterable of pairs (key, priority)
         or {key: priority} mapping to initialize the priority queue.
+
+        Optional keyword arguments will be added in a queue: their names will be interpreted as
+        keys, and their values will be interpreted as priorities.
 
         Runtime complexity: `O(n)`
         """
@@ -44,6 +48,7 @@ class BaseHeapDict(MutableMapping, ABC):
             iterable = iterable.items()
         elif not isinstance(iterable, Iterable):
             raise TypeError(f'{type(iterable).__qualname__!r} object is not iterable')
+        iterable = chain(iterable, kwargs.items())
         self._heap = []
         self._keys = {}
         for key, priority in iterable:

@@ -125,6 +125,10 @@ class TestHeapDict:
             # error if create from non-iterable
             with pytest.raises(TypeError):
                 heapdict = HeapDict(10)  # noqa
+            # create from keyword arguments
+            heapdict = HeapDict({'a': 5, 'b': 1, 'c': 10}, b=20, iterable=3)
+            self.check_invariants(heapdict)
+            assert dict(heapdict) == {'a': 5, 'b': 20, 'c': 10, 'iterable': 3}
 
     def test_pop_item_by_last_index_in_heap(self):
         # Удаление элемента кучи по последнему индексу требует осторожности в реализации.
