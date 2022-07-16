@@ -4,7 +4,6 @@ from typing import (
     MutableMapping,
     overload,
     Iterable,
-    Mapping,
     Iterator
 )
 
@@ -18,13 +17,10 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
     def __init__(self, **kwargs: P) -> None: ...
 
     @overload
-    def __init__(self, iterable: Mapping[K, P], /, **kwargs: P) -> None: ...
-
-    @overload
-    def __init__(self, iterable: Iterable[tuple[K, P]], /, **kwargs: P) -> None: ...
+    def __init__(self, iterable: Iterable, /, **kwargs) -> None: ...
 
     @classmethod
-    def fromkeys(cls, iterable: Iterable[K], value: P) -> BaseHeapDict[K, P]: ...
+    def fromkeys(cls, iterable: Iterable, value) -> BaseHeapDict[K, P]: ...
 
     _heap: list[tuple[K, P]] = []
     _keys: dict[K, int] = {}
