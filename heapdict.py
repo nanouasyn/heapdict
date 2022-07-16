@@ -65,6 +65,10 @@ class BaseHeapDict(MutableMapping, ABC):
         """ Create a new priority queue with keys from iterable and priorities set to value. """
         return cls((k, value) for k in iterable)
 
+    def _swap(self, i, j):
+        self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
+        self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
+
     @abstractmethod
     def _sift_down(self, i):
         """ Swaps the *i*-th node with the parent nodes until the invariant is restored. """
@@ -72,23 +76,6 @@ class BaseHeapDict(MutableMapping, ABC):
     @abstractmethod
     def _sift_up(self, i):
         """ Swaps the *i*-th node with the child nodes until the invariant is restored. """
-
-    def _swap(self, i, j):
-        self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
-        self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
-
-    @use_docstring_of(dict.__len__)
-    def __len__(self):
-        return len(self._keys)
-
-    @use_docstring_of(dict.__iter__)
-    def __iter__(self):
-        yield from self._keys
-
-    @use_docstring_of(dict.__repr__)
-    def __repr__(self) -> str:
-        items = ', '.join(f'{key!r}: {priority!r}' for key, priority in self.items())
-        return f'{type(self).__name__}({{{items}}})'
 
     @use_docstring_of(dict.__getitem__)
     def __getitem__(self, key):
@@ -120,25 +107,6 @@ class BaseHeapDict(MutableMapping, ABC):
             self._sift_down(i)
             self._sift_up(i)
 
-    @use_docstring_of(dict.copy)
-    def __copy__(self):
-        return self.copy()
-
-    @use_docstring_of(dict.copy)
-    def copy(self):
-        new_heap_dict = type(self)()
-        new_heap_dict._heap = self._heap.copy()
-        new_heap_dict._keys = self._keys.copy()
-        return new_heap_dict
-
-    # Родительский clear удалял бы каждый ключ по очереди, что привело бы к накладным расходам
-    # на восстановление свойств кучи после каждого удаления. Поэтому мы переопределяем этот
-    # метод более эффективной реализацией.
-    @use_docstring_of(dict.clear)
-    def clear(self):
-        self._heap.clear()
-        self._keys.clear()
-
     def popitem(self):
         try:
             key, priority = self._heap[0]
@@ -152,6 +120,35 @@ class BaseHeapDict(MutableMapping, ABC):
             return self._heap[0]
         except IndexError:
             raise KeyError("can't peek item: heapdict is empty")
+
+    @use_docstring_of(dict.__len__)
+    def __len__(self):
+        return len(self._keys)
+
+    @use_docstring_of(dict.__iter__)
+    def __iter__(self):
+        yield from self._keys
+
+    @use_docstring_of(dict.clear)
+    def clear(self):
+        self._heap.clear()
+        self._keys.clear()
+
+    @use_docstring_of(dict.copy)
+    def copy(self):
+        new_heap_dict = type(self)()
+        new_heap_dict._heap = self._heap.copy()
+        new_heap_dict._keys = self._keys.copy()
+        return new_heap_dict
+
+    @use_docstring_of(dict.copy)
+    def __copy__(self):
+        return self.copy()
+
+    @use_docstring_of(dict.__repr__)
+    def __repr__(self) -> str:
+        items = ', '.join(f'{key!r}: {priority!r}' for key, priority in self.items())
+        return f'{type(self).__name__}({{{items}}})'
 
 
 class MinHeapDict(BaseHeapDict):
