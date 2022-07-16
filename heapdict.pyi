@@ -22,8 +22,8 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
     @classmethod
     def fromkeys(cls, iterable: Iterable, value) -> BaseHeapDict[K, P]: ...
 
-    _heap: list[tuple[K, P]] = []
-    _keys: dict[K, int] = {}
+    _heap: list[tuple[K, P]]
+    _keys: dict[K, int]
 
     def __len__(self) -> int: ...
 
@@ -57,7 +57,7 @@ class BaseHeapDict(MutableMapping[K, P], ABC):
 class MinHeapDict(BaseHeapDict[K, P]):
 
     @classmethod
-    def fromkeys(cls, iterable: Iterable[K], value: P) -> MinHeapDict[K, P]: ...
+    def fromkeys(cls, iterable, value) -> MinHeapDict[K, P]: ...
 
     def __copy__(self) -> MinHeapDict[K, P]: ...
 
@@ -67,7 +67,7 @@ class MinHeapDict(BaseHeapDict[K, P]):
 class MaxHeapDict(BaseHeapDict[K, P]):
 
     @classmethod
-    def fromkeys(cls, iterable: Iterable[K], value: P) -> MaxHeapDict[K, P]: ...
+    def fromkeys(cls, iterable, value) -> MaxHeapDict[K, P]: ...
 
     def __copy__(self) -> MaxHeapDict[K, P]: ...
 
