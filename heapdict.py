@@ -129,6 +129,18 @@ class BaseHeapDict(MutableMapping, ABC):
     def __iter__(self):
         yield from self._keys
 
+    @use_docstring_of(dict.__or__)
+    def __or__(self, other):
+        if not isinstance(other, Mapping):
+            return NotImplemented
+        return type(self)(chain(self.items(), other.items()))
+
+    @use_docstring_of(dict.__ror__)
+    def __ror__(self, other):
+        if not isinstance(other, Mapping):
+            return NotImplemented
+        return type(self)(chain(other.items(), self.items()))
+
     @use_docstring_of(dict.clear)
     def clear(self):
         self._heap.clear()
