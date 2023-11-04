@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from functools import partial
 from itertools import chain
 from typing import Mapping, MutableMapping, Iterable
@@ -22,8 +21,8 @@ def use_docstring_of(target):
     return decorator
 
 
-class BaseHeapDict(MutableMapping, ABC):
-    def __init__(self, iterable=None, /, **kwargs):
+class BaseHeapDict(MutableMapping):
+    def __init__(self, iterable=None, /, *, reverse=False, **kwargs):
         """Initialize priority queue instance.
 
         Optional *iterable* argument provides an initial iterable of pairs
@@ -48,6 +47,7 @@ class BaseHeapDict(MutableMapping, ABC):
         iterable = chain(iterable, kwargs.items())
         self._heap = []
         self._keys = {}
+        self._reverse = reverse
         for key, priority in iterable:
             if (i := self._keys.get(key, None)) is not None:
                 self._heap[i] = (key, priority)
@@ -69,19 +69,29 @@ class BaseHeapDict(MutableMapping, ABC):
         self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
         self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
 
-    @abstractmethod
-    def _sift_down(self, i):
-        """Swap the *i*-th node with the parent nodes until the invariant is
-        restored.
-
-        """
-
-    @abstractmethod
     def _sift_up(self, i):
-        """Swap the *i*-th node with the child nodes until the invariant is
-        restored.
+        select_next = partial(
+            max if self._reverse else min, key=lambda i: self._heap[i][1]
+        )
+        while True:
+            next_index = select_next(
+                x for x in [i, 2 * i + 1, 2 * i + 2] if x < len(self._heap)
+            )
+            if next_index == i:
+                return
+            self._swap(i, next_index)
+            i = next_index
 
-        """
+    def _sift_down(self, i):
+        select_next = partial(
+            min if self._reverse else max, key=lambda i: self._heap[i][1]
+        )
+        while True:
+            next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
+            if next_index == i:
+                return
+            self._swap(i, next_index)
+            i = next_index
 
     @use_docstring_of(dict.__getitem__)
     def __getitem__(self, key):
@@ -189,26 +199,6 @@ class MinHeapDict(BaseHeapDict):
 
     """
 
-    def _sift_down(self, i):
-        select_next = partial(max, key=lambda i: self._heap[i][1])
-        while True:
-            next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
-            if next_index == i:
-                return
-            self._swap(i, next_index)
-            i = next_index
-
-    def _sift_up(self, i):
-        select_next = partial(min, key=lambda i: self._heap[i][1])
-        while True:
-            next_index = select_next(
-                x for x in [i, 2 * i + 1, 2 * i + 2] if x < len(self._heap)
-            )
-            if next_index == i:
-                return
-            self._swap(i, next_index)
-            i = next_index
-
     def popitem(self):
         """Remove and return a (key, priority) pair as 2-tuple.
 
@@ -266,25 +256,9 @@ class MaxHeapDict(BaseHeapDict):
 
     """
 
-    def _sift_down(self, i):
-        select_next = partial(min, key=lambda i: self._heap[i][1])
-        while True:
-            next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
-            if next_index == i:
-                return
-            self._swap(i, next_index)
-            i = next_index
-
-    def _sift_up(self, i):
-        select_next = partial(max, key=lambda i: self._heap[i][1])
-        while True:
-            next_index = select_next(
-                x for x in [i, 2 * i + 1, 2 * i + 2] if x < len(self._heap)
-            )
-            if next_index == i:
-                return
-            self._swap(i, next_index)
-            i = next_index
+    def __init__(self, iterable=None, /, **kwargs):
+        kwargs['reverse'] = True
+        super().__init__(iterable, **kwargs)
 
     def popitem(self):
         """Remove and return a (key, priority) pair as 2-tuple.

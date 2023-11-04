@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import (
     TypeVar,
     MutableMapping,
@@ -11,16 +10,19 @@ from typing import (
 K = TypeVar("K")
 P = TypeVar("P")
 
-class BaseHeapDict(MutableMapping[K, P], ABC):
+class BaseHeapDict(MutableMapping[K, P]):
     @overload
-    def __init__(self, **kwargs: P) -> None: ...
+    def __init__(self, *, reverse=False, **kwargs: P) -> None: ...
     @overload
-    def __init__(self, iterable: Iterable, /, **kwargs) -> None: ...
+    def __init__(
+        self, iterable: Iterable, /, *, reverse=False, **kwargs
+    ) -> None: ...
     @classmethod
     def fromkeys(cls, iterable: Iterable, value) -> BaseHeapDict[K, P]: ...
 
     _heap: list[tuple[K, P]]
     _keys: dict[K, int]
+    _reverse: bool
 
     def __len__(self) -> int: ...
     def __iter__(self) -> Iterator[K]: ...
