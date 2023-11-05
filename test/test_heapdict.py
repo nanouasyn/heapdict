@@ -2,11 +2,11 @@ import pytest
 import copy
 from hypothesis import given, strategies as st
 
-from heapdict import MinHeapDict, MaxHeapDict
+from heapdict import HeapDict
 
 
 class TestHeapDict:
-    def check_invariants(self, heapdict: MaxHeapDict | MinHeapDict):
+    def check_invariants(self, heapdict: HeapDict):
         assert len(heapdict._keys) == len(heapdict._heap)
         assert all(
             heapdict._heap[i][0] == key for key, i in heapdict._keys.items()
@@ -16,13 +16,14 @@ class TestHeapDict:
             for i, (key, _) in enumerate(heapdict._heap)
         )
         for i in range(1, len(heapdict._heap)):
-            if isinstance(heapdict, MinHeapDict):
-                assert heapdict._heap[i][1] >= heapdict._heap[(i - 1) // 2][1]
-            else:
+            if heapdict.maxheap:
                 assert heapdict._heap[i][1] <= heapdict._heap[(i - 1) // 2][1]
+            else:
+                assert heapdict._heap[i][1] >= heapdict._heap[(i - 1) // 2][1]
 
     def test_basic_usage(self):
-        heapdict = MinHeapDict()
+        heapdict = HeapDict()
+        assert not heapdict.maxheap
         self.check_invariants(heapdict)
         assert len(heapdict) == 0
         # Пустой HeapDict эквивалентен False. Мы следуем соглашению для
@@ -79,9 +80,9 @@ class TestHeapDict:
         assert len(heapdict) == 3
         assert heapdict.peekitem() == ("a", 5)
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_errors(self, cls):
-        heapdict = cls()
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_errors(self, maxheap):
+        heapdict = HeapDict(maxheap=maxheap)
         with pytest.raises(KeyError):
             heapdict.popitem()
         with pytest.raises(KeyError):
@@ -99,36 +100,47 @@ class TestHeapDict:
         assert len(heapdict) == 0
         self.check_invariants(heapdict)
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_create(self, cls):
-        heapdict = cls.fromkeys(["a", "b", "c", "b"], 0)
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_create(self, maxheap):
+        heapdict = HeapDict.fromkeys(["a", "b", "c", "b"], 0, maxheap=maxheap)
         self.check_invariants(heapdict)
+        assert len(heapdict) == 3
         assert dict(heapdict) == {"a": 0, "b": 0, "c": 0}
 
-        heapdict = cls([("a", 5), ("b", 1), ("c", 10), ("b", 20)])
+        heapdict = HeapDict(
+            [("a", 5), ("b", 1), ("c", 10), ("b", 20)], maxheap=maxheap
+        )
         self.check_invariants(heapdict)
+        assert len(heapdict) == 3
         assert dict(heapdict) == {"a": 5, "b": 20, "c": 10}
 
-        heapdict = cls({"a": 5, "b": 1, "c": 10, "b": 20})  # noqa
+        heapdict = HeapDict(
+            {"a": 5, "b": 1, "c": 10, "b": 20}, maxheap=maxheap  # noqa
+        )
         self.check_invariants(heapdict)
+        assert len(heapdict) == 3
         assert dict(heapdict) == {"a": 5, "b": 20, "c": 10}
 
-        for another_cls in [MinHeapDict, MaxHeapDict]:
-            another_heapdict = another_cls(
-                {"a": 5, "b": 1, "c": 10, "b": 20}  # noqa
+        for another_heapdict_maxheap in [False, True]:
+            another_heapdict = HeapDict(
+                {"a": 5, "b": 1, "c": 10, "b": 20},  # noqa
+                maxheap=another_heapdict_maxheap,
             )
-            heapdict = cls(another_heapdict)
+            heapdict = HeapDict(another_heapdict)
             self.check_invariants(heapdict)
+            assert len(heapdict) == len(another_heapdict)
             assert dict(heapdict) == {"a": 5, "b": 20, "c": 10}
 
-        heapdict = cls()
+        heapdict = HeapDict(maxheap=maxheap)
         self.check_invariants(heapdict)
         assert dict(heapdict) == {}
 
         with pytest.raises(TypeError):
-            heapdict = cls(10)  # noqa
+            heapdict = HeapDict(10, maxheap=maxheap)  # noqa
 
-        heapdict = cls({"a": 5, "b": 1, "c": 10}, b=20, iterable=3)
+        heapdict = HeapDict(
+            {"a": 5, "b": 1, "c": 10}, b=20, iterable=3, maxheap=maxheap
+        )
         self.check_invariants(heapdict)
         assert dict(heapdict) == {"a": 5, "b": 20, "c": 10, "iterable": 3}
 
@@ -137,29 +149,29 @@ class TestHeapDict:
         # реализации. Если обменять последний элемент с последним же, который
         # сейчас удаляется, и попытаться восстановить свойство кучи для этого
         # элемента, возможна ошибка.
-        heapdict = MinHeapDict({"a": 1, "b": 2})
+        heapdict = HeapDict({"a": 1, "b": 2})
         assert heapdict.peekitem() == ("a", 1)
         heapdict.pop("b")
         self.check_invariants(heapdict)
         assert len(heapdict) == 1
 
-        heapdict = MaxHeapDict({"a": 1, "b": 2})
+        heapdict = HeapDict({"a": 1, "b": 2}, maxheap=True)
         assert heapdict.peekitem() == ("b", 2)
         heapdict.pop("b")
         self.check_invariants(heapdict)
         assert len(heapdict) == 1
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
+    @pytest.mark.parametrize("maxheap", [False, True])
     def test_preserves_insertion_order_on_change_priority_for_existing_key(
-        self, cls
+        self, maxheap
     ):
-        heapdict = cls({"a": 1, "b": 5, "c": 10})
+        heapdict = HeapDict({"a": 1, "b": 5, "c": 10}, maxheap=maxheap)
         heapdict["b"] = 20
         assert list(heapdict.items()) == [("a", 1), ("b", 20), ("c", 10)]
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_preserves_insertion_order_on_update(self, cls):
-        heapdict = cls({"a": 1, "b": 5, "c": 10})
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_preserves_insertion_order_on_update(self, maxheap):
+        heapdict = HeapDict({"a": 1, "b": 5, "c": 10}, maxheap=maxheap)
 
         heapdict.update({"d": 13, "b": 20, "e": 10, "c": 10})
         assert list(heapdict.items()) == [
@@ -170,29 +182,28 @@ class TestHeapDict:
             ("e", 10),
         ]
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_clear(self, cls):
-        heapdict = cls([("a", 1), ("b", 2), ("c", 3), ("d", 2), ("c", 3)])
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_clear(self, maxheap):
+        heapdict = HeapDict(
+            [("a", 1), ("b", 2), ("c", 3), ("d", 2), ("c", 3)], maxheap=maxheap
+        )
 
-        heapdict.clear()
-        self.check_invariants(heapdict)
-        assert len(heapdict) == 0
-
-        heapdict.clear()
-        self.check_invariants(heapdict)
-        assert len(heapdict) == 0
+        for _ in range(2):
+            heapdict.clear()
+            self.check_invariants(heapdict)
+            assert len(heapdict) == 0
 
     @pytest.mark.parametrize(
-        "cls, copy_func",
+        "maxheap, copy_func",
         [
-            (MinHeapDict, copy.copy),
-            (MinHeapDict, lambda x: x.copy()),
-            (MaxHeapDict, copy.copy),
-            (MaxHeapDict, lambda x: x.copy()),
+            (False, copy.copy),
+            (False, lambda x: x.copy()),
+            (True, copy.copy),
+            (True, lambda x: x.copy()),
         ],
     )
-    def test_copy(self, cls, copy_func):
-        original = cls(zip("abcdef", [3, 3, 1, 6, 3, 4]))
+    def test_copy(self, maxheap, copy_func):
+        original = HeapDict(zip("abcdef", [3, 3, 1, 6, 3, 4]), maxheap=maxheap)
         clone = copy_func(original)
         self.check_invariants(original)
         self.check_invariants(clone)
@@ -214,30 +225,41 @@ class TestHeapDict:
         self.check_invariants(clone)
 
     def test_repr(self):
-        heapdict = MinHeapDict({"a": 1, "b": 2, "c": 3})
-        assert repr(heapdict) == "MinHeapDict({'a': 1, 'b': 2, 'c': 3})"
-        heapdict = MaxHeapDict({"a": 1, "b": 2, "c": 3})
-        assert repr(heapdict) == "MaxHeapDict({'a': 1, 'b': 2, 'c': 3})"
+        heapdict = HeapDict({"a": 1, "b": 2, "c": 3})
+        assert repr(heapdict) == "HeapDict({'a': 1, 'b': 2, 'c': 3})"
+        heapdict = HeapDict({"a": 1, "b": 2, "c": 3}, maxheap=True)
+        expected_repr = "HeapDict({'a': 1, 'b': 2, 'c': 3}, maxheap=True)"
+        assert repr(heapdict) == expected_repr
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_or(self, cls):
-        union = cls({"a": 1, "b": 2}) | cls({"c": 3})
-        assert isinstance(union, cls)
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_or(self, maxheap):
+        heapdict = HeapDict({"a": 1, "b": 2}, maxheap=maxheap)
+
+        union = heapdict | HeapDict({"c": 3}, maxheap=maxheap)
+        assert isinstance(union, HeapDict)
+        assert union.maxheap == maxheap
         assert union == {"a": 1, "b": 2, "c": 3}
 
-        union = cls({"a": 1, "b": 2}) | dict(c=3)
-        assert isinstance(union, cls)
+        union = heapdict | HeapDict({"c": 3}, maxheap=not maxheap)
+        assert isinstance(union, HeapDict)
+        assert union.maxheap == maxheap
         assert union == {"a": 1, "b": 2, "c": 3}
 
-        union = dict(a=1) | cls({"b": 2, "c": 3})
-        assert isinstance(union, cls)
+        union = heapdict | dict(c=3)
+        assert isinstance(union, HeapDict)
+        assert union.maxheap == maxheap
         assert union == {"a": 1, "b": 2, "c": 3}
 
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_saves_last_duplicate(self, cls):
+        union = dict(c=3) | heapdict
+        assert isinstance(union, HeapDict)
+        assert union.maxheap == maxheap
+        assert union == {"c": 3, "a": 1, "b": 2}
+
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_saves_last_duplicate(self, maxheap):
         # Наполняем объект парами с одинаковыми, но не идентичными ключами.
         pairs = [(tuple([1]), 3), (tuple([1]), 1), (tuple([1]), 2)]
-        heapdict = cls(pairs)
+        heapdict = HeapDict(pairs, maxheap=maxheap)
         self.check_invariants(heapdict)
         # Сохранилась только последняя пара ключ-значение.
         assert len(heapdict) == 1
@@ -245,13 +267,11 @@ class TestHeapDict:
         assert heapdict.peekitem()[0] is pairs[-1][0]
 
     @given(st.lists(st.integers()))
-    @pytest.mark.parametrize("cls", [MinHeapDict, MaxHeapDict])
-    def test_priorities_extracted_in_a_sort_order(self, cls, alist):
-        heapdict = cls(enumerate(alist))
+    @pytest.mark.parametrize("maxheap", [False, True])
+    def test_priorities_extracted_in_a_sort_order(self, maxheap, alist):
+        heapdict = HeapDict(enumerate(alist), maxheap=maxheap)
         priorities = []
         while heapdict:
             _, priority = heapdict.popitem()
             priorities.append(priority)
-        assert priorities == sorted(
-            alist, reverse=isinstance(heapdict, MaxHeapDict)
-        )
+        assert priorities == sorted(alist, reverse=heapdict.maxheap)

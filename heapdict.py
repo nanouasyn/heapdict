@@ -21,17 +21,36 @@ def use_docstring_of(target):
     return decorator
 
 
-class BaseHeapDict(MutableMapping):
-    def __init__(self, iterable=None, /, *, reverse=False, **kwargs):
+class HeapDict(MutableMapping):
+    """Priority queue that supports fast retrieving items with the lowest
+    priority and fast changing priorities for arbitrary keys.
+
+    Implements the ``dict`` interface, the keys of which are priority queue
+    elements, and the values are priorities of these elements. Items are
+    extracted with ``popitem`` method in ascending order of their priority.
+
+    The search of the lowest priority item has `O(1)` runtime complexity. The
+    extraction of this item or arbitraty item by key has complexity of
+    `O(log(n))`. Adding or removing items or changing priority of existing keys
+    has also `O(log(n))` runtime complexity. In other respects ``HeapDict``
+    has the same runtime complexity as the built-in ``dict``.
+
+    """
+
+    def __init__(self, iterable=None, /, *, maxheap=False, **kwargs):
         """Initialize priority queue instance.
 
         Optional *iterable* argument provides an initial iterable of pairs
         (key, priority) or {key: priority} mapping to initialize the priority
         queue.
 
-        Optional keyword arguments will be added in a queue: their names will
-        be interpreted as keys, and their values will be interpreted as
-        priorities.
+        By default, a min heap is created, but if *maxheap* parameter is
+        ``True``, then it is max heap, that is, the elements with the
+        highest priority are extracted first.
+
+        Other optional keyword arguments will be added in a queue as pairs:
+        their names will be interpreted as keys, and their values will be
+        interpreted as priorities.
 
         Runtime complexity: `O(n)`
 
@@ -47,7 +66,7 @@ class BaseHeapDict(MutableMapping):
         iterable = chain(iterable, kwargs.items())
         self._heap = []
         self._keys = {}
-        self._reverse = reverse
+        self._maxheap = maxheap
         for key, priority in iterable:
             if (i := self._keys.get(key, None)) is not None:
                 self._heap[i] = (key, priority)
@@ -58,12 +77,15 @@ class BaseHeapDict(MutableMapping):
             self._sift_up(i)
 
     @classmethod
-    def fromkeys(cls, iterable, value):
+    def fromkeys(cls, iterable, value, maxheap=False):
         """Create a new priority queue with keys from iterable and priorities
         set to value.
 
+        By default, a min heap is created, but if *maxheap* parameter is
+        ``True``, then it is max heap, that is, the elements with the
+        highest priority are extracted first.
         """
-        return cls((k, value) for k in iterable)
+        return cls(((k, value) for k in iterable), maxheap=maxheap)
 
     def _swap(self, i, j):
         self._keys[self._heap[i][0]], self._keys[self._heap[j][0]] = j, i
@@ -71,7 +93,7 @@ class BaseHeapDict(MutableMapping):
 
     def _sift_up(self, i):
         select_next = partial(
-            max if self._reverse else min, key=lambda i: self._heap[i][1]
+            max if self.maxheap else min, key=lambda i: self._heap[i][1]
         )
         while True:
             next_index = select_next(
@@ -84,7 +106,7 @@ class BaseHeapDict(MutableMapping):
 
     def _sift_down(self, i):
         select_next = partial(
-            min if self._reverse else max, key=lambda i: self._heap[i][1]
+            min if self.maxheap else max, key=lambda i: self._heap[i][1]
         )
         while True:
             next_index = select_next(x for x in [i, (i - 1) // 2] if x >= 0)
@@ -92,6 +114,10 @@ class BaseHeapDict(MutableMapping):
                 return
             self._swap(i, next_index)
             i = next_index
+
+    @property
+    def maxheap(self):
+        return self._maxheap
 
     @use_docstring_of(dict.__getitem__)
     def __getitem__(self, key):
@@ -126,6 +152,24 @@ class BaseHeapDict(MutableMapping):
             self._sift_up(i)
 
     def popitem(self):
+        """Remove and return a (key, priority) pair as 2-tuple.
+
+        Removed pair will be the pair with the lowest priority (or the highest
+        if ``maxheap=True``).
+
+        >>> heapdict = HeapDict({'x': 5, 'y': 1, 'z': 10})
+        >>> heapdict
+        HeapDict({'x': 5, 'y': 1, 'z': 10})
+        >>> heapdict.popitem()
+        ('y', 1)
+        >>> heapdict # heapdict has changed
+        HeapDict({'x': 5, 'z': 10})
+
+        Runtime complexity: `O(log(n))`.
+
+        :raises KeyError: if heapdict is empty
+
+        """
         try:
             key, priority = self._heap[0]
         except IndexError:
@@ -134,6 +178,24 @@ class BaseHeapDict(MutableMapping):
         return key, priority
 
     def peekitem(self):
+        """Return a (key, priority) pair as 2-tuple.
+
+        Returned pair will be the pair with the lowest priority (or the highest
+        if ``maxheap=True``).
+
+        >>> heapdict = HeapDict({'x': 5, 'y': 1, 'z': 10})
+        >>> heapdict
+        HeapDict({'x': 5, 'y': 1, 'z': 10})
+        >>> heapdict.peekitem()
+        ('y', 1)
+        >>> heapdict # heapdict has not changed
+        HeapDict({'x': 5, 'y': 1, 'z': 10})
+
+        Runtime complexity: `O(1)`
+
+        :raises KeyError: if heapdict is empty
+
+        """
         try:
             return self._heap[0]
         except IndexError:
@@ -151,13 +213,17 @@ class BaseHeapDict(MutableMapping):
     def __or__(self, other):
         if not isinstance(other, Mapping):
             return NotImplemented
-        return type(self)(chain(self.items(), other.items()))
+        return type(self)(
+            chain(self.items(), other.items()), maxheap=self.maxheap
+        )
 
     @use_docstring_of(dict.__ror__)
     def __ror__(self, other):
         if not isinstance(other, Mapping):
             return NotImplemented
-        return type(self)(chain(other.items(), self.items()))
+        return type(self)(
+            chain(other.items(), self.items()), maxheap=self.maxheap
+        )
 
     @use_docstring_of(dict.clear)
     def clear(self):
@@ -166,7 +232,7 @@ class BaseHeapDict(MutableMapping):
 
     @use_docstring_of(dict.copy)
     def copy(self):
-        new_heap_dict = type(self)()
+        new_heap_dict = type(self)(maxheap=self.maxheap)
         new_heap_dict._heap = self._heap.copy()
         new_heap_dict._keys = self._keys.copy()
         return new_heap_dict
@@ -177,124 +243,10 @@ class BaseHeapDict(MutableMapping):
 
     @use_docstring_of(dict.__repr__)
     def __repr__(self) -> str:
-        items = ", ".join(
-            f"{key!r}: {priority!r}" for key, priority in self.items()
-        )
-        return f"{type(self).__name__}({{{items}}})"
-
-
-class MinHeapDict(BaseHeapDict):
-    """Priority queue that supports fast retrieving items with the lowest
-    priority and fast changing priorities for arbitrary keys.
-
-    Implements the ``dict`` interface, the keys of which are priority queue
-    elements, and the values are priorities of these elements. Items are
-    extracted with ``popitem`` method in ascending order of their priority.
-
-    The search of the lowest priority item has `O(1)` runtime complexity. The
-    extraction of this item or arbitraty item by key has complexity of
-    `O(log(n))`. Adding or removing items or changing priority of existing keys
-    has also `O(log(n))` runtime complexity. In other respects ``MinHeapDict``
-    has the same runtime complexity as the built-in ``dict``.
-
-    """
-
-    def popitem(self):
-        """Remove and return a (key, priority) pair as 2-tuple.
-
-        Removed pair will be the pair with the lowest priority.
-
-        >>> heapdict = MinHeapDict({'x': 5, 'y': 1, 'z': 10})
-        >>> heapdict
-        MinHeapDict({'x': 5, 'y': 1, 'z': 10})
-        >>> heapdict.popitem()
-        ('y', 1)
-        >>> heapdict # heapdict has changed
-        MinHeapDict({'x': 5, 'z': 10})
-
-        Runtime complexity: `O(log(n))`.
-
-        :raises KeyError: if heapdict is empty
-
-        """
-        return super().popitem()
-
-    def peekitem(self):
-        """Return a (key, priority) pair as 2-tuple.
-
-        Returned pair will be the pair with the lowest priority.
-
-        >>> heapdict = MinHeapDict({'x': 5, 'y': 1, 'z': 10})
-        >>> heapdict
-        MinHeapDict({'x': 5, 'y': 1, 'z': 10})
-        >>> heapdict.peekitem()
-        ('y', 1)
-        >>> heapdict # heapdict has not changed
-        MinHeapDict({'x': 5, 'y': 1, 'z': 10})
-
-        Runtime complexity: `O(1)`
-
-        :raises KeyError: if heapdict is empty
-
-        """
-        return super().peekitem()
-
-
-class MaxHeapDict(BaseHeapDict):
-    """Priority queue that supports fast retrieving items with the highest
-    priority and fast changing priorities for arbitrary keys.
-
-    Implements the ``dict`` interface, the keys of which are priority queue
-    elements, and the values are priorities of these elements. Items are
-    extracted with ``popitem`` method in descending order of their priority.
-
-    The search of the highest priority item has `O(1)` runtime complexity.
-    The extraction of this item or arbitraty item by key has complexity of
-    `O(log(n))`. Adding or removing items or changing priority of existing keys
-    has also `O(log(n))` runtime complexity. In other respects ``MaxHeapDict``
-    has the same runtime complexity as the built-in ``dict``.
-
-    """
-
-    def __init__(self, iterable=None, /, **kwargs):
-        kwargs['reverse'] = True
-        super().__init__(iterable, **kwargs)
-
-    def popitem(self):
-        """Remove and return a (key, priority) pair as 2-tuple.
-
-        Removed pair will be the pair with the highest priority.
-
-        >>> heapdict = MaxHeapDict({'x': 1, 'y': 10, 'z': 5})
-        >>> heapdict
-        MaxHeapDict({'x': 1, 'y': 10, 'z': 5})
-        >>> heapdict.popitem()
-        ('y', 10)
-        >>> heapdict
-        MaxHeapDict({'x': 1, 'z': 5})
-
-        Runtime complexity: `O(log(n))`.
-
-        :raises KeyError: if heapdict is empty
-
-        """
-        return super().popitem()
-
-    def peekitem(self):
-        """Return a (key, priority) pair as 2-tuple.
-
-        Returned pair will be the pair with the highest priority.
-
-        >>> heapdict = MaxHeapDict({'x': 1, 'y': 10, 'z': 5})
-        >>> heapdict
-        MaxHeapDict({'x': 1, 'y': 10, 'z': 5})
-        >>> heapdict.peekitem()
-        ('y', 10)
-        >>> heapdict # heapdict has not changed
-        MaxHeapDict({'x': 1, 'y': 10, 'z': 5})
-
-        Runtime complexity: `O(1)`
-
-        :raises KeyError: if heapdict is empty
-        """
-        return super().peekitem()
+        items = (f"{key!r}: {priority!r}" for key, priority in self.items())
+        items = ", ".join(items)
+        args = [f"{{{items}}}"]
+        if self.maxheap:
+            args.append("maxheap=True")
+        args = ", ".join(args)
+        return f"{type(self).__name__}({args})"
