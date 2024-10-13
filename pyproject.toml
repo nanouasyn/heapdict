@@ -1,15 +1,15 @@
 [tool.poetry]
 name = "heapdict"
-version = "0.1.0"
+version = "0.2.0"
 description = "implementation of priority queue with a dict interface"
 authors = ["Evgeniy Selezniov <nanouasyn@mail.ru>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pytest-cov = "^3.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.test.dependencies]
 pytest = "^7.1.2"
+pytest-cov = "^3.0.0"
 hypothesis = "^6.49.1"
 
 [build-system]
