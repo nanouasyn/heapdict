@@ -392,26 +392,23 @@ def test_sorting_by_random_extractions(alist, random):
     assert_heapdict_is_empty(heapdict)
 
 
-@given(st.randoms(use_true_random=True))
-def test_compare_with_builtin_dict_behavior(random):
-    keys = list("abcde")
-    values = range(-5, 5)
+@given(
+    operations=st.lists(
+        st.one_of(
+            st.tuples(
+                st.just('set'),
+                st.sampled_from(range(5)),
+                st.integers(),
+            ),
+            st.tuples(st.just('pop'), st.sampled_from(range(5))),
+        )
+    )
+)
+def test_compare_with_builtin_dict_behavior(operations):
     operation_types = {
         "set": lambda key, value: lambda d: operator.setitem(d, key, value),
         "pop": lambda key: lambda d: d.pop(key),
     }
-    operations = []
-    for _ in range(50):
-        operation_type = random.choice(list(operation_types))
-        if operation_type == "set":
-            operation = ("set", random.choice(keys), random.choice(values))
-            operations.append(operation)
-        elif operation_type == "pop":
-            operation = ("pop", random.choice(keys))
-        else:
-            assert False
-        operations.append(operation)
-    hypothesis.note(f"{operations = }")
 
     heapdict = HeapDict()
     builtin_dict = dict()
