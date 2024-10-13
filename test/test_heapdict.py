@@ -34,6 +34,12 @@ def check_heapdict_invariants(heapdict: HeapDict):
             assert priorities[heap[grandparent]] >= priorities[heap[i]]
 
 
+def assert_heapdict_is_empty(heapdict):
+    assert heapdict._priorities == {}
+    assert heapdict._heap == []
+    assert heapdict._indexes == {}
+
+
 @contextmanager
 def heapdict_not_changes(heapdict: HeapDict):
     heapdict_copy = heapdict.copy()
@@ -61,35 +67,6 @@ def assert_args_are_equivalent_by_function(func, a, b):
 
     assert a_result == b_result
     assert type(a_error) is type(b_error)
-
-
-def assert_heapdict_is_empty(heapdict):
-    assert not heapdict
-    assert len(heapdict) == 0
-    assert dict(heapdict) == {}
-
-    with pytest.raises(ValueError):
-        _ = heapdict.min_item()
-    assert heapdict.min_item(default=42) == 42
-
-    with pytest.raises(ValueError):
-        _ = heapdict.pop_min_item()
-    assert heapdict.pop_min_item(default=42) == 42
-
-    with pytest.raises(ValueError):
-        _ = heapdict.max_item()
-    assert heapdict.max_item(default=42) == 42
-
-    with pytest.raises(ValueError):
-        _ = heapdict.pop_max_item()
-    assert heapdict.pop_max_item(default=42) == 42
-
-    with pytest.raises(ValueError):
-        _ = heapdict.popitem()
-
-    assert heapdict._priorities == {}
-    assert heapdict._heap == []
-    assert heapdict._indexes == {}
 
 
 def test_create_empty():
@@ -226,6 +203,33 @@ def test_copy(copy_func):
 
     assert clone["a"] == 100
     assert original["a"] != 100
+
+
+def test_empty_behavior():
+    heapdict = HeapDict()
+
+    assert not heapdict
+    assert len(heapdict) == 0
+    assert dict(heapdict) == {}
+
+    with pytest.raises(ValueError):
+        _ = heapdict.min_item()
+    assert heapdict.min_item(default=42) == 42
+
+    with pytest.raises(ValueError):
+        _ = heapdict.pop_min_item()
+    assert heapdict.pop_min_item(default=42) == 42
+
+    with pytest.raises(ValueError):
+        _ = heapdict.max_item()
+    assert heapdict.max_item(default=42) == 42
+
+    with pytest.raises(ValueError):
+        _ = heapdict.pop_max_item()
+    assert heapdict.pop_max_item(default=42) == 42
+
+    with pytest.raises(ValueError):
+        _ = heapdict.popitem()
 
 
 @given(pairs=st.lists(st.tuples(st.integers(), st.integers()), min_size=1))
