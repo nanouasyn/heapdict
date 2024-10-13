@@ -370,7 +370,6 @@ class HeapDict(MutableMapping):
 
     def __repr__(self) -> str:
         """Return repr(self)."""
-        if self:
-            return f"{type(self).__name__}({self._priorities})"
-        else:
+        if not self:
             return f"{type(self).__name__}()"
+        return f"{type(self).__name__}({self._priorities})"

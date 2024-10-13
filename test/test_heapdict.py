@@ -60,7 +60,7 @@ def assert_args_are_equivalent_by_function(func, a, b):
         b_error = e
 
     assert a_result == b_result
-    assert type(a_error) == type(b_error)
+    assert type(a_error) is type(b_error)
 
 
 def assert_heapdict_is_empty(heapdict):
