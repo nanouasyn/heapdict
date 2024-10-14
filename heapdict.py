@@ -296,11 +296,11 @@ class HeapDict(MutableMapping):
         RuntimeComplexity: `O(log(n))`.
         """
         i = self._indexes[key]
-        self._swap(i, len(self._heap) - 1)
         self._priorities.pop(key)
         self._indexes.pop(key)
-        self._heap.pop()
+        end_key = self._heap.pop()
         if i < len(self._heap):
+            self._heap[i], self._indexes[end_key] = end_key, i
             self._push_up(i)
             self._push_down(i)
 
