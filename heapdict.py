@@ -81,8 +81,9 @@ class HeapDict(MutableMapping):
         self._indexes = {k: v for v, k in enumerate(self._priorities)}
 
         # Restoring the heap invariant.
+        push_down = self._push_down
         for i in reversed(range(len(self._heap) // 2)):
-            self._push_down(i)
+            push_down(i)
 
     @classmethod
     def fromkeys(cls, iterable, value, /):
@@ -131,13 +132,15 @@ class HeapDict(MutableMapping):
         return partial(selector, key=lambda i: priorities[heap[i]])
 
     def _push_down(self, i):
+        with_children = self._with_children
+        with_grandchildren = self._with_grandchildren
         select = self._get_selector(self._get_level(i))
         while True:
-            should_be_parent = select(self._with_children(i))
+            should_be_parent = select(with_children(i))
             if should_be_parent != i:
                 self._swap(i, should_be_parent)
 
-            should_be_grandparent = select(self._with_grandchildren(i))
+            should_be_grandparent = select(with_grandchildren(i))
             if should_be_grandparent == i:
                 return
             self._swap(i, should_be_grandparent)
@@ -152,8 +155,9 @@ class HeapDict(MutableMapping):
             self._swap(i, parent)
             i = parent
 
+        get_grandparent = self._get_grandparent
         select = self._get_selector(self._get_level(i))
-        while (grandparent := self._get_grandparent(i)) >= 0:
+        while (grandparent := get_grandparent(i)) >= 0:
             if select(grandparent, i) == grandparent:
                 break
             self._swap(i, grandparent)
